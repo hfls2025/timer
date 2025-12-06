@@ -1,0 +1,886 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>计时器</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+      background: #000;
+      color: #fff;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .container {
+      max-width: 430px;
+      margin: 0 auto;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      padding: 60px 16px 20px;
+      font-size: 34px;
+      font-weight: 700;
+    }
+
+    /* 选择器视图 */
+    .picker-view {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding: 0 16px;
+    }
+
+    .picker-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 220px;
+      position: relative;
+    }
+
+    .picker-wrapper {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+    }
+
+    .picker-column {
+      position: relative;
+      height: 220px;
+      overflow: hidden;
+    }
+
+    .picker-column.hours { width: 70px; }
+    .picker-column.minutes { width: 70px; }
+    .picker-column.seconds { width: 70px; }
+
+    .picker-label {
+      position: absolute;
+      right: -30px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 17px;
+      font-weight: 600;
+      color: #fff;
+      z-index: 10;
+      pointer-events: none;
+    }
+
+    .picker-scroll {
+      height: 100%;
+      overflow-y: scroll;
+      scroll-snap-type: y mandatory;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+
+    .picker-scroll::-webkit-scrollbar { display: none; }
+
+    .picker-item {
+      height: 44px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 23px;
+      font-weight: 400;
+      color: #fff;
+      scroll-snap-align: center;
+      transition: opacity 0.1s, transform 0.1s;
+    }
+
+    .picker-highlight {
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 44px;
+      transform: translateY(-50%);
+      background: rgba(118, 118, 128, 0.24);
+      border-radius: 8px;
+      pointer-events: none;
+    }
+
+    .picker-mask {
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 88px;
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    .picker-mask.top {
+      top: 0;
+      background: linear-gradient(to bottom, #000 0%, transparent 100%);
+    }
+
+    .picker-mask.bottom {
+      bottom: 0;
+      background: linear-gradient(to top, #000 0%, transparent 100%);
+    }
+
+    /* 最近使用 */
+    .recent-section {
+      padding: 30px 0;
+    }
+
+    .recent-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #8e8e93;
+    }
+
+    .recent-list {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      background: rgba(118, 118, 128, 0.24);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .recent-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: rgba(28, 28, 30, 1);
+      position: relative;
+      overflow: hidden;
+      touch-action: pan-x;
+    }
+
+    .recent-item-content {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      transition: transform 0.2s ease;
+    }
+
+    .recent-delete {
+      position: absolute;
+      right: 0;
+      top: 0;
+      bottom: 0;
+      width: 80px;
+      background: #ff3b30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 500;
+    }
+
+    .recent-time {
+      font-size: 28px;
+      font-weight: 300;
+      letter-spacing: 1px;
+    }
+
+    .recent-play {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: rgba(52, 199, 89, 0.2);
+      border: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+
+    .recent-play svg {
+      fill: #34c759;
+      margin-left: 3px;
+    }
+
+    /* 计时视图 */
+    .timer-view {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      padding: 0 16px;
+    }
+
+    .timer-display {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .timer-ring {
+      position: relative;
+      width: 300px;
+      height: 300px;
+    }
+
+    .timer-ring svg {
+      transform: rotate(-90deg);
+      width: 100%;
+      height: 100%;
+    }
+
+    .timer-ring-bg {
+      fill: none;
+      stroke: #3a3a3c;
+      stroke-width: 6;
+    }
+
+    .timer-ring-progress {
+      fill: none;
+      stroke: #ff9f0a;
+      stroke-width: 6;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 0.1s linear;
+    }
+
+    .timer-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 70px;
+      font-weight: 200;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 2px;
+    }
+
+    /* 按钮 */
+    .buttons {
+      display: flex;
+      justify-content: space-between;
+      padding: 20px 20px 50px;
+      gap: 20px;
+    }
+
+    .btn {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      border: none;
+      font-size: 17px;
+      font-weight: 500;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .btn::before {
+      content: '';
+      position: absolute;
+      inset: 3px;
+      border-radius: 50%;
+      border: 2px solid #000;
+    }
+
+    .btn-cancel {
+      background: rgba(72, 72, 74, 1);
+      color: #fff;
+    }
+
+    .btn-start {
+      background: rgba(52, 199, 89, 0.3);
+      color: #34c759;
+    }
+
+    .btn-pause {
+      background: rgba(255, 159, 10, 0.3);
+      color: #ff9f0a;
+    }
+
+    .btn-resume {
+      background: rgba(52, 199, 89, 0.3);
+      color: #34c759;
+    }
+
+    /* 铃声选择 */
+    .sound-section {
+      margin-top: auto;
+      padding: 16px 0;
+    }
+
+    .sound-btn {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      padding: 14px 16px;
+      background: rgba(28, 28, 30, 1);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 17px;
+      cursor: pointer;
+    }
+
+    .sound-btn span:last-child {
+      color: #8e8e93;
+    }
+
+    /* 声音弹窗 */
+    .sound-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.5);
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      z-index: 100;
+    }
+
+    .sound-modal.show { display: flex; }
+
+    .sound-modal-content {
+      background: #1c1c1e;
+      border-radius: 14px 14px 0 0;
+      width: 100%;
+      max-width: 430px;
+      max-height: 60vh;
+      overflow-y: auto;
+    }
+
+    .sound-modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid #3a3a3c;
+    }
+
+    .sound-modal-header h3 {
+      font-size: 17px;
+      font-weight: 600;
+    }
+
+    .sound-modal-close {
+      background: none;
+      border: none;
+      color: #ff9f0a;
+      font-size: 17px;
+      cursor: pointer;
+    }
+
+    .sound-option {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      border-bottom: 1px solid #3a3a3c;
+      cursor: pointer;
+    }
+
+    .sound-option.selected::after {
+      content: '✓';
+      color: #ff9f0a;
+      font-size: 17px;
+    }
+
+    /* 完成弹窗 */
+    .alert-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+    }
+
+    .alert-modal.show { display: flex; }
+
+    .alert-content {
+      background: rgba(44, 44, 46, 0.95);
+      border-radius: 14px;
+      width: 270px;
+      text-align: center;
+      backdrop-filter: blur(20px);
+    }
+
+    .alert-body {
+      padding: 20px 16px;
+    }
+
+    .alert-title {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .alert-message {
+      font-size: 13px;
+      color: #8e8e93;
+    }
+
+    .alert-btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-top: 1px solid #3a3a3c;
+      background: none;
+      color: #ff9f0a;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">计时器</div>
+
+    <!-- 选择器视图 -->
+    <div class="picker-view" id="pickerView">
+      <div class="picker-container">
+        <div class="picker-highlight"></div>
+        <div class="picker-mask top"></div>
+        <div class="picker-mask bottom"></div>
+        <div class="picker-wrapper">
+          <div class="picker-column hours">
+            <div class="picker-scroll" id="hourPicker"></div>
+            <span class="picker-label">时</span>
+          </div>
+          <div class="picker-column minutes">
+            <div class="picker-scroll" id="minutePicker"></div>
+            <span class="picker-label">分</span>
+          </div>
+          <div class="picker-column seconds">
+            <div class="picker-scroll" id="secondPicker"></div>
+            <span class="picker-label">秒</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="sound-section">
+        <button class="sound-btn" id="soundBtn">
+          <span>计时结束时</span>
+          <span id="currentSound">雷达</span>
+        </button>
+      </div>
+
+      <div class="buttons">
+        <button class="btn btn-cancel" id="cancelBtn">取消</button>
+        <button class="btn btn-start" id="startBtn">开始</button>
+      </div>
+
+      <div class="recent-section" id="recentSection" style="display:none;">
+        <div class="recent-title">最近使用</div>
+        <div class="recent-list" id="recentList"></div>
+      </div>
+    </div>
+
+    <!-- 计时视图 -->
+    <div class="timer-view" id="timerView">
+      <div class="timer-display">
+        <div class="timer-ring">
+          <svg viewBox="0 0 300 300">
+            <circle class="timer-ring-bg" cx="150" cy="150" r="140"/>
+            <circle class="timer-ring-progress" id="timerProgress" cx="150" cy="150" r="140"/>
+          </svg>
+          <div class="timer-text" id="timerText">00:00:00</div>
+        </div>
+      </div>
+
+      <div class="buttons">
+        <button class="btn btn-cancel" id="cancelBtn2">取消</button>
+        <button class="btn btn-pause" id="pauseBtn">暂停</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 声音选择弹窗 -->
+  <div class="sound-modal" id="soundModal">
+    <div class="sound-modal-content">
+      <div class="sound-modal-header">
+        <span></span>
+        <h3>计时结束时</h3>
+        <button class="sound-modal-close" id="soundModalClose">完成</button>
+      </div>
+      <div id="soundOptions"></div>
+    </div>
+  </div>
+
+  <!-- 完成提示弹窗 -->
+  <div class="alert-modal" id="alertModal">
+    <div class="alert-content">
+      <div class="alert-body">
+        <div class="alert-title">计时器</div>
+        <div class="alert-message" id="alertTime">00:00:00</div>
+      </div>
+      <button class="alert-btn" id="alertOk">好</button>
+    </div>
+  </div>
+
+  <script>
+    // 状态
+    let totalSeconds = 0;
+    let remainingSeconds = 0;
+    let timerInterval = null;
+    let isPaused = false;
+    let selectedSound = '雷达';
+    let recentTimers = JSON.parse(localStorage.getItem('recentTimers') || '[]');
+
+    // 音效列表
+    const sounds = ['雷达', '信号', '丝绸', '涟漪', '棱镜', '水晶', '灯塔', '电波', '静音'];
+
+    // DOM
+    const hourPicker = document.getElementById('hourPicker');
+    const minutePicker = document.getElementById('minutePicker');
+    const secondPicker = document.getElementById('secondPicker');
+    const pickerView = document.getElementById('pickerView');
+    const timerView = document.getElementById('timerView');
+    const timerText = document.getElementById('timerText');
+    const timerProgress = document.getElementById('timerProgress');
+    const startBtn = document.getElementById('startBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const cancelBtn2 = document.getElementById('cancelBtn2');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const soundBtn = document.getElementById('soundBtn');
+    const soundModal = document.getElementById('soundModal');
+    const soundModalClose = document.getElementById('soundModalClose');
+    const soundOptions = document.getElementById('soundOptions');
+    const currentSound = document.getElementById('currentSound');
+    const alertModal = document.getElementById('alertModal');
+    const alertOk = document.getElementById('alertOk');
+    const alertTime = document.getElementById('alertTime');
+    const recentSection = document.getElementById('recentSection');
+    const recentList = document.getElementById('recentList');
+
+    // 圆环周长
+    const circumference = 2 * Math.PI * 140;
+    timerProgress.style.strokeDasharray = circumference;
+    timerProgress.style.strokeDashoffset = 0;
+
+    // 初始化选择器
+    function initPicker(container, max, pad = 2) {
+      const padding = 2; // 上下各2个空项
+      let html = '';
+      for (let i = 0; i < padding; i++) html += '<div class="picker-item"></div>';
+      for (let i = 0; i <= max; i++) {
+        html += `<div class="picker-item" data-value="${i}">${String(i).padStart(pad, '0')}</div>`;
+      }
+      for (let i = 0; i < padding; i++) html += '<div class="picker-item"></div>';
+      container.innerHTML = html;
+    }
+
+    function getPickerValue(container) {
+      const scrollTop = container.scrollTop;
+      const index = Math.round(scrollTop / 44);
+      const item = container.querySelector(`[data-value="${index}"]`);
+      return item ? parseInt(item.dataset.value) : 0;
+    }
+
+    function setPickerValue(container, value) {
+      container.scrollTop = value * 44;
+    }
+
+    // 更新选择器项的样式
+    function updatePickerStyles(container) {
+      const items = container.querySelectorAll('.picker-item[data-value]');
+      const scrollTop = container.scrollTop;
+      const centerY = scrollTop + 88; // 中心位置
+
+      items.forEach(item => {
+        const itemTop = item.offsetTop;
+        const itemCenter = itemTop + 22;
+        const distance = Math.abs(centerY - itemCenter);
+        const opacity = Math.max(0.3, 1 - distance / 132);
+        const scale = Math.max(0.85, 1 - distance / 440);
+        item.style.opacity = opacity;
+        item.style.transform = `scale(${scale})`;
+      });
+    }
+
+    initPicker(hourPicker, 23);
+    initPicker(minutePicker, 59);
+    initPicker(secondPicker, 59);
+
+    // 默认1分钟
+    setTimeout(() => {
+      setPickerValue(minutePicker, 1);
+      [hourPicker, minutePicker, secondPicker].forEach(updatePickerStyles);
+    }, 50);
+
+    // 滚动事件
+    [hourPicker, minutePicker, secondPicker].forEach(picker => {
+      picker.addEventListener('scroll', () => updatePickerStyles(picker));
+    });
+
+    // 格式化时间
+    function formatTime(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      if (h > 0) {
+        return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+      }
+      return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function formatTimeDisplay(seconds) {
+      const h = Math.floor(seconds / 3600);
+      const m = Math.floor((seconds % 3600) / 60);
+      const s = seconds % 60;
+      return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    // 更新进度环
+    function updateProgress() {
+      const progress = remainingSeconds / totalSeconds;
+      const offset = circumference * (1 - progress);
+      timerProgress.style.strokeDashoffset = offset;
+    }
+
+    // 开始计时
+    function startTimer() {
+      const h = getPickerValue(hourPicker);
+      const m = getPickerValue(minutePicker);
+      const s = getPickerValue(secondPicker);
+      totalSeconds = h * 3600 + m * 60 + s;
+
+      if (totalSeconds === 0) return;
+
+      // 保存到最近使用
+      const timeStr = formatTimeDisplay(totalSeconds);
+      recentTimers = recentTimers.filter(t => t !== totalSeconds);
+      recentTimers.unshift(totalSeconds);
+      recentTimers = recentTimers.slice(0, 5);
+      localStorage.setItem('recentTimers', JSON.stringify(recentTimers));
+
+      remainingSeconds = totalSeconds;
+      isPaused = false;
+
+      pickerView.style.display = 'none';
+      timerView.style.display = 'flex';
+
+      timerText.textContent = formatTimeDisplay(remainingSeconds);
+      updateProgress();
+
+      pauseBtn.textContent = '暂停';
+      pauseBtn.className = 'btn btn-pause';
+
+      timerInterval = setInterval(tick, 1000);
+    }
+
+    function tick() {
+      if (isPaused) return;
+
+      remainingSeconds--;
+      timerText.textContent = formatTimeDisplay(remainingSeconds);
+      updateProgress();
+
+      if (remainingSeconds <= 0) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+        playSound();
+        showAlert();
+      }
+    }
+
+    // 暂停/继续
+    function togglePause() {
+      isPaused = !isPaused;
+      if (isPaused) {
+        pauseBtn.textContent = '继续';
+        pauseBtn.className = 'btn btn-resume';
+      } else {
+        pauseBtn.textContent = '暂停';
+        pauseBtn.className = 'btn btn-pause';
+      }
+    }
+
+    // 取消
+    function cancelTimer() {
+      clearInterval(timerInterval);
+      timerInterval = null;
+      isPaused = false;
+      pickerView.style.display = 'flex';
+      timerView.style.display = 'none';
+      renderRecent();
+    }
+
+    // 播放声音
+    let audioContext;
+    function playSound() {
+      if (selectedSound === '静音') return;
+      
+      try {
+        audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        oscillator.frequency.value = 880;
+        oscillator.type = 'sine';
+        gainNode.gain.value = 0.3;
+        
+        oscillator.start();
+        
+        // 模拟雷达声音模式
+        let count = 0;
+        const beep = () => {
+          if (count >= 6) {
+            oscillator.stop();
+            return;
+          }
+          gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+          gainNode.gain.setValueAtTime(0, audioContext.currentTime + 0.1);
+          count++;
+          setTimeout(beep, 200);
+        };
+        beep();
+      } catch (e) {
+        console.log('Audio not supported');
+      }
+    }
+
+    // 显示完成提示
+    function showAlert() {
+      alertTime.textContent = formatTimeDisplay(totalSeconds);
+      alertModal.classList.add('show');
+    }
+
+    // 渲染最近使用
+    function renderRecent() {
+      if (recentTimers.length === 0) {
+        recentSection.style.display = 'none';
+        return;
+      }
+      recentSection.style.display = 'block';
+      recentList.innerHTML = recentTimers.map(seconds => `
+        <div class="recent-item" data-seconds="${seconds}">
+          <div class="recent-delete">删除</div>
+          <div class="recent-item-content">
+            <span class="recent-time">${formatTime(seconds)}</span>
+            <button class="recent-play">
+              <svg width="16" height="18" viewBox="0 0 16 18">
+                <path d="M2 1.5v15l12-7.5-12-7.5z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // 渲染声音选项
+    function renderSoundOptions() {
+      soundOptions.innerHTML = sounds.map(sound => `
+        <div class="sound-option ${sound === selectedSound ? 'selected' : ''}" data-sound="${sound}">
+          ${sound}
+        </div>
+      `).join('');
+    }
+
+    // 事件绑定
+    startBtn.addEventListener('click', startTimer);
+    cancelBtn.addEventListener('click', () => {
+      setPickerValue(hourPicker, 0);
+      setPickerValue(minutePicker, 1);
+      setPickerValue(secondPicker, 0);
+    });
+    cancelBtn2.addEventListener('click', cancelTimer);
+    pauseBtn.addEventListener('click', togglePause);
+
+    soundBtn.addEventListener('click', () => {
+      renderSoundOptions();
+      soundModal.classList.add('show');
+    });
+
+    soundModalClose.addEventListener('click', () => {
+      soundModal.classList.remove('show');
+    });
+
+    soundOptions.addEventListener('click', (e) => {
+      const option = e.target.closest('.sound-option');
+      if (option) {
+        selectedSound = option.dataset.sound;
+        currentSound.textContent = selectedSound;
+        renderSoundOptions();
+      }
+    });
+
+    alertOk.addEventListener('click', () => {
+      alertModal.classList.remove('show');
+      cancelTimer();
+    });
+
+    recentList.addEventListener('click', (e) => {
+      const deleteBtn = e.target.closest('.recent-delete');
+      if (deleteBtn) {
+        const item = deleteBtn.closest('.recent-item');
+        const seconds = parseInt(item.dataset.seconds);
+        recentTimers = recentTimers.filter(t => t !== seconds);
+        localStorage.setItem('recentTimers', JSON.stringify(recentTimers));
+        renderRecent();
+        return;
+      }
+      
+      const item = e.target.closest('.recent-item');
+      if (item) {
+        const seconds = parseInt(item.dataset.seconds);
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        const s = seconds % 60;
+        setPickerValue(hourPicker, h);
+        setPickerValue(minutePicker, m);
+        setPickerValue(secondPicker, s);
+        setTimeout(startTimer, 100);
+      }
+    });
+
+    // 滑动删除
+    let touchStartX = 0;
+    let currentSwipeItem = null;
+
+    recentList.addEventListener('touchstart', (e) => {
+      const item = e.target.closest('.recent-item');
+      if (!item) return;
+      touchStartX = e.touches[0].clientX;
+      currentSwipeItem = item;
+    });
+
+    recentList.addEventListener('touchmove', (e) => {
+      if (!currentSwipeItem) return;
+      const deltaX = e.touches[0].clientX - touchStartX;
+      const content = currentSwipeItem.querySelector('.recent-item-content');
+      if (deltaX < 0) {
+        content.style.transform = `translateX(${Math.max(deltaX, -80)}px)`;
+      } else {
+        content.style.transform = 'translateX(0)';
+      }
+    });
+
+    recentList.addEventListener('touchend', (e) => {
+      if (!currentSwipeItem) return;
+      const content = currentSwipeItem.querySelector('.recent-item-content');
+      const deltaX = e.changedTouches[0].clientX - touchStartX;
+      if (deltaX < -40) {
+        content.style.transform = 'translateX(-80px)';
+      } else {
+        content.style.transform = 'translateX(0)';
+      }
+      currentSwipeItem = null;
+    });
+
+    // 初始化
+    renderRecent();
+  </script>
+</body>
+</html>
